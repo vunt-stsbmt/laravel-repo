@@ -142,18 +142,48 @@
 
                     <div
                         class="rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-6">
-                        <h2 class="text-lg font-semibold text-white">Bạn muốn gì tiếp theo?</h2>
-                        <p class="mt-3 text-sm text-slate-300">Có thể mở rộng: kiểm tra DNS, ping server, hoặc hiển thị
-                            vị trí ước tính.</p>
-                        <div class="mt-6 flex flex-wrap gap-3">
-                            <span
-                                class="rounded-full border border-slate-700/60 bg-slate-900/60 px-3 py-1 text-xs text-slate-300">DNS
-                                Lookup</span>
-                            <span
-                                class="rounded-full border border-slate-700/60 bg-slate-900/60 px-3 py-1 text-xs text-slate-300">Whois</span>
-                            <span
-                                class="rounded-full border border-slate-700/60 bg-slate-900/60 px-3 py-1 text-xs text-slate-300">Latency
-                                Test</span>
+                        <h2 class="text-lg font-semibold text-white">Kiểm tra ping</h2>
+                        <p class="mt-2 text-sm text-slate-300">Đo độ trễ TCP (cổng 443/80) tới host bạn chọn.</p>
+                        <form class="mt-4 flex flex-wrap gap-3" method="GET">
+                            <input
+                                type="text"
+                                name="ping_host"
+                                value="{{ $pingHostInput ?? '' }}"
+                                placeholder="Ví dụ: google.com"
+                                class="h-10 flex-1 rounded-xl border border-slate-700/70 bg-slate-950/70 px-3 text-sm text-slate-100 placeholder:text-slate-500"
+                            />
+                            <button
+                                type="submit"
+                                class="h-10 rounded-xl border border-slate-700/70 bg-slate-900/80 px-4 text-sm font-medium text-slate-200 transition hover:border-cyan-400/60 hover:text-white"
+                            >
+                                Ping
+                            </button>
+                        </form>
+                        @if (!empty($pingError))
+                            <div
+                                class="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-100">
+                                {{ $pingError }}
+                            </div>
+                        @elseif (!empty($pingResult))
+                            <div
+                                class="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+                                {{ $pingResult['host'] }} ({{ $pingResult['ip'] }}) · {{ $pingResult['latency_ms'] }} ms
+                                · Port {{ $pingResult['port'] }}
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6">
+                        <h2 class="text-lg font-semibold text-white">Vị trí ước tính</h2>
+                        <p class="mt-2 text-sm text-slate-300">Dựa trên dữ liệu ISP, độ chính xác mang tính tham khảo.</p>
+                        <div class="mt-4 rounded-xl border border-slate-800/60 bg-slate-950/60 p-4">
+                            <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Khu vực</p>
+                            <p class="mt-2 text-sm text-slate-200">
+                                {{ $ipData['city'] ?? '-' }}, {{ $ipData['regionName'] ?? '-' }}
+                            </p>
+                            <p class="mt-1 text-sm text-slate-400">
+                                {{ $ipData['country'] ?? '-' }} · {{ $ipData['lat'] ?? '-' }}, {{ $ipData['lon'] ?? '-' }}
+                            </p>
                         </div>
                     </div>
                 </aside>

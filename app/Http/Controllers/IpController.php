@@ -24,6 +24,9 @@ class IpController extends Controller
         $error = null;
         $mapUrl = null;
         $mapLink = null;
+        $pingHostInput = trim((string) $request->query('ping_host', ''));
+        $pingResult = null;
+        $pingError = null;
 
         try {
             if (!$ip) {
@@ -57,6 +60,10 @@ class IpController extends Controller
             $error = 'Không thể kết nối API.';
         }
 
+        if ($pingHostInput !== '') {
+            [$pingResult, $pingError] = $this->pingHost($pingHostInput);
+        }
+
         return view('index', [
             'ip' => $ip,
             'isV6' => $isV6,
@@ -64,6 +71,9 @@ class IpController extends Controller
             'error' => $error,
             'mapUrl' => $mapUrl,
             'mapLink' => $mapLink,
+            'pingHostInput' => $pingHostInput,
+            'pingResult' => $pingResult,
+            'pingError' => $pingError,
         ]);
     }
 
@@ -116,5 +126,103 @@ class IpController extends Controller
             FILTER_VALIDATE_IP,
             FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
         );
+    }
+
+    private function pingHost(string $input): array
+    {
+        $host = $this->normalizeHost($input);
+        if (!$host) {
+            return [null, 'Host không hợp lệ.'];
+        }
+
+        $resolvedIp = $this->resolveHostIp($host);
+        if (!$resolvedIp) {
+            return [null, 'Không thể phân giải DNS.'];
+        }
+
+        if (!$this->isPublicIp($resolvedIp)) {
+            return [null, 'Chỉ hỗ trợ ping tới IP public.'];
+        }
+
+        $ports = [443, 80];
+        $timeout = 2.5;
+        $start = microtime(true);
+        $selectedPort = null;
+        $connection = null;
+
+        foreach ($ports as $port) {
+            $errNo = 0;
+            $errStr = '';
+            $connection = @fsockopen($host, $port, $errNo, $errStr, $timeout);
+            if ($connection) {
+                $selectedPort = $port;
+                break;
+            }
+        }
+
+        if (!$connection) {
+            return [null, 'Không thể kết nối tới host.'];
+        }
+
+        $latencyMs = (int) round((microtime(true) - $start) * 1000);
+        fclose($connection);
+
+        return [[
+            'host' => $host,
+            'ip' => $resolvedIp,
+            'port' => $selectedPort,
+            'latency_ms' => $latencyMs,
+        ], null];
+    }
+
+    private function normalizeHost(string $input): ?string
+    {
+        $input = trim($input);
+        if ($input === '') {
+            return null;
+        }
+
+        if (str_starts_with($input, 'http://') || str_starts_with($input, 'https://')) {
+            $parsed = parse_url($input);
+            $input = $parsed['host'] ?? '';
+        }
+
+        $input = preg_replace('/:\d+$/', '', $input);
+        if ($input === '' || strlen($input) > 255) {
+            return null;
+        }
+
+        if (filter_var($input, FILTER_VALIDATE_IP)) {
+            return $input;
+        }
+
+        if (filter_var($input, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+            return $input;
+        }
+
+        return null;
+    }
+
+    private function resolveHostIp(string $host): ?string
+    {
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return $host;
+        }
+
+        $ipv4 = gethostbyname($host);
+        if ($ipv4 && $ipv4 !== $host) {
+            return $ipv4;
+        }
+
+        $records = dns_get_record($host, DNS_AAAA);
+        if (is_array($records)) {
+            foreach ($records as $record) {
+                if (!empty($record['ipv6'])) {
+                    return $record['ipv6'];
+                }
+            }
+        }
+
+        return null;
     }
 }
