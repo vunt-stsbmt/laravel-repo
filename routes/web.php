@@ -1,7 +1,6 @@
 <?php
 
+use App\Http\Controllers\IpController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [IpController::class, 'index']);
