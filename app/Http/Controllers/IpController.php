@@ -9,7 +9,7 @@ class IpController extends Controller
 {
     public function index(Request $request)
     {
-        $ip = $request->ip();
+        $ip = $this->resolveClientIp($request);
         $isV6 = str_contains($ip ?? '', ':');
 
         $ipData = null;
@@ -18,7 +18,12 @@ class IpController extends Controller
         $mapLink = null;
 
         try {
-            $response = Http::timeout(4)->get("http://ip-api.com/json/{$ip}", [
+            if (!$ip) {
+                throw new \RuntimeException('Không xác định được IP.');
+            }
+
+            $queryIp = rawurlencode($ip);
+            $response = Http::timeout(4)->get("http://ip-api.com/json/{$queryIp}", [
                 'fields' => 'status,message,country,regionName,city,zip,lat,lon,timezone,isp,org,as,query',
             ]);
 
@@ -52,5 +57,56 @@ class IpController extends Controller
             'mapUrl' => $mapUrl,
             'mapLink' => $mapLink,
         ]);
+    }
+
+    private function resolveClientIp(Request $request): ?string
+    {
+        $candidates = [];
+
+        $headerValues = [
+            $request->header('CF-Connecting-IP'),
+            $request->header('X-Real-IP'),
+        ];
+
+        foreach ($headerValues as $value) {
+            if (is_string($value) && $value !== '') {
+                $candidates[] = $value;
+            }
+        }
+
+        $forwardedFor = $request->header('X-Forwarded-For');
+        if (is_string($forwardedFor) && $forwardedFor !== '') {
+            foreach (explode(',', $forwardedFor) as $part) {
+                $part = trim($part);
+                if ($part !== '') {
+                    $candidates[] = $part;
+                }
+            }
+        }
+
+        $candidates[] = $request->ip();
+
+        foreach ($candidates as $candidate) {
+            if ($this->isPublicIp($candidate)) {
+                return $candidate;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && $candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function isPublicIp(string $ip): bool
+    {
+        return (bool) filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        );
     }
 }
