@@ -1,5 +1,6 @@
 services:
   app:
+    container_name: laravel-app:prod
     build:
       context: .
       dockerfile: Dockerfile.prod
@@ -18,6 +19,7 @@ services:
       - appnet
 
   web:
+    container_name: laravel-nginx:prod
     image: nginx:1.25-alpine
     ports:
       - "8080:80"
@@ -30,6 +32,7 @@ services:
       - appnet
 
   db:
+    container_name: laravel-db:prod
     image: mysql:8.0
     environment:
       MYSQL_DATABASE: ${DB_DATABASE:-laravel}
@@ -46,6 +49,7 @@ services:
 volumes:
   appdata:
   dbdata:
+
 
 networks:
   appnet:
