@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class IpController extends Controller
 {
@@ -11,6 +12,13 @@ class IpController extends Controller
     {
         $ip = $this->resolveClientIp($request);
         $isV6 = str_contains($ip ?? '', ':');
+
+        Log::info('IP_CHECK_REQUEST', [
+            'ip' => $ip,
+            'is_ipv6' => $isV6,
+            'user_agent' => $request->userAgent(),
+            'url' => $request->fullUrl(),
+        ]);
 
         $ipData = null;
         $error = null;
