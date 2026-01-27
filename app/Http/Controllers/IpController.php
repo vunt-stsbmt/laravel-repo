@@ -47,8 +47,9 @@ class IpController extends Controller
                     $lon = $payload['lon'] ?? null;
 
                     if ($lat !== null && $lon !== null) {
-                        $mapUrl = "https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker={$lat},{$lon}";
-                        $mapLink = "https://www.openstreetmap.org/?mlat={$lat}&mlon={$lon}#map=12/{$lat}/{$lon}";
+                        $zoom = 12;
+                        $mapUrl = "https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker={$lat},{$lon}&zoom={$zoom}";
+                        $mapLink = "https://www.openstreetmap.org/?mlat={$lat}&mlon={$lon}#map={$zoom}/{$lat}/{$lon}";
                     }
                 } else {
                     $error = $payload['message'] ?? 'Không lấy được thông tin IP.';
