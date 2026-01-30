@@ -1,8 +1,9 @@
-name: Deploy Laravel App
+name: CD Laravel
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "main", "master" ]
+    branches: [main]
 
 jobs:
   deploy:
@@ -11,27 +12,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy files via SSH
+      - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
           source: "."
-          target: "/home/${{ secrets.SERVER_USER }}/app"
+          target: ${{ secrets.DEPLOY_PATH }}
 
-      - name: SSH and Deploy
+      - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
           script: |
-            cd /home/${{ secrets.SERVER_USER }}/app
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
             docker compose -f docker-compose.prod.yml pull || true
-            docker compose -f docker-compose.prod.yml up --build -d
+            docker compose -f docker-compose.prod.yml up -d --build
+
+            docker exec laravel-app-prod php artisan optimize:clear
             docker exec laravel-app-prod php artisan migrate --force
             docker exec laravel-app-prod php artisan config:cache
             docker exec laravel-app-prod php artisan route:cache
