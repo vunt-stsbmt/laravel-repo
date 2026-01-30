@@ -9,6 +9,9 @@ mkdir -p /var/www/storage /var/www/bootstrap/cache
 chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 chmod -R ug+rwx /var/www/storage /var/www/bootstrap/cache
 
+# Ensure no stale cached providers from build/dev are shipped to prod.
+rm -f /var/www/bootstrap/cache/*.php
+
 if [ ! -d /var/www/vendor ]; then
   if command -v composer >/dev/null 2>&1; then
     composer install --no-interaction --prefer-dist --optimize-autoloader
