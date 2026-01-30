@@ -10,7 +10,16 @@ class IpController extends Controller
 {
     public function index(Request $request)
     {
-        $ip = $this->resolveClientIp($request);
+        $lookupIpInput = trim((string) $request->query('ip', ''));
+        $lookupIp = $lookupIpInput !== '' ? $lookupIpInput : null;
+        $lookupError = null;
+
+        if ($lookupIp !== null && !filter_var($lookupIp, FILTER_VALIDATE_IP)) {
+            $lookupError = 'IP không hợp lệ.';
+            $lookupIp = null;
+        }
+
+        $ip = $lookupIp ?? $this->resolveClientIp($request);
         $isV6 = str_contains($ip ?? '', ':');
 
         Log::info('IP_CHECK_REQUEST', [
@@ -21,12 +30,11 @@ class IpController extends Controller
         ]);
 
         $ipData = null;
-        $error = null;
-        $mapUrl = null;
-        $mapLink = null;
+        $error = $lookupError;
         $pingHostInput = trim((string) $request->query('ping_host', ''));
         $pingResult = null;
         $pingError = null;
+        $latencyCards = $this->buildLatencyCards();
 
         try {
             if (!$ip) {
@@ -43,14 +51,6 @@ class IpController extends Controller
 
                 if (($payload['status'] ?? null) === 'success') {
                     $ipData = $payload;
-                    $lat = $payload['lat'] ?? null;
-                    $lon = $payload['lon'] ?? null;
-
-                    if ($lat !== null && $lon !== null) {
-                        $zoom = 12;
-                        $mapUrl = "https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker={$lat},{$lon}&zoom={$zoom}";
-                        $mapLink = "https://www.openstreetmap.org/?mlat={$lat}&mlon={$lon}#map={$zoom}/{$lat}/{$lon}";
-                    }
                 } else {
                     $error = $payload['message'] ?? 'Không lấy được thông tin IP.';
                 }
@@ -70,11 +70,11 @@ class IpController extends Controller
             'isV6' => $isV6,
             'ipData' => $ipData,
             'error' => $error,
-            'mapUrl' => $mapUrl,
-            'mapLink' => $mapLink,
+            'lookupIpInput' => $lookupIpInput,
             'pingHostInput' => $pingHostInput,
             'pingResult' => $pingResult,
             'pingError' => $pingError,
+            'latencyCards' => $latencyCards,
         ]);
     }
 
@@ -174,6 +174,38 @@ class IpController extends Controller
             'port' => $selectedPort,
             'latency_ms' => $latencyMs,
         ], null];
+    }
+
+    private function buildLatencyCards(): array
+    {
+        $targets = [
+            ['name' => 'ByteDance', 'tag' => 'nội địa', 'host' => 'www.bytedance.com'],
+            ['name' => 'Bilibili', 'tag' => 'nội địa', 'host' => 'www.bilibili.com'],
+            ['name' => 'WeChat', 'tag' => 'nội địa', 'host' => 'www.wechat.com'],
+            ['name' => 'taobao', 'tag' => 'nội địa', 'host' => 'www.taobao.com'],
+            ['name' => 'GitHub', 'tag' => 'tính quốc tế', 'host' => 'github.com'],
+            ['name' => 'jsDelivr', 'tag' => 'tính quốc tế', 'host' => 'www.jsdelivr.com'],
+            ['name' => 'Cloudflare', 'tag' => 'tính quốc tế', 'host' => 'www.cloudflare.com'],
+            ['name' => 'YouTube', 'tag' => 'tính quốc tế', 'host' => 'www.youtube.com'],
+        ];
+
+        $cards = [];
+        foreach ($targets as $target) {
+            [$result, $error] = $this->pingHost($target['host']);
+            $latency = $result['latency_ms'] ?? null;
+            $score = $latency ? max(1, 10 - (int) floor($latency / 20)) : 0;
+
+            $cards[] = [
+                'name' => $target['name'],
+                'tag' => $target['tag'],
+                'host' => $target['host'],
+                'latency_ms' => $latency,
+                'score' => $score,
+                'error' => $error,
+            ];
+        }
+
+        return $cards;
     }
 
     private function normalizeHost(string $input): ?string
