@@ -14,6 +14,7 @@ services:
     volumes:
       - ./storage:/var/www/storage
       - ./bootstrap/cache:/var/www/bootstrap/cache
+      - ./public:/var/www/public
     depends_on:
       - db
     networks:
